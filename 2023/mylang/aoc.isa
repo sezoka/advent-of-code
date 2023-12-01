@@ -1,0 +1,173 @@
+string :: []int;
+
+exit :: fn() {
+  @js("throw new Error()");
+};
+
+copy_string :: fn(str: string) []int {
+  new_str := []int{};
+
+  for i := 0; i < @int_arr_len(str); i += 1 {
+    @int_arr_push(new_str, str[i]);
+  }
+
+  return new_str;
+};
+
+concat_strings :: fn(str1: string, str2: string) []int {
+  new_str := copy_string(str1);
+
+  for i := 0; i < @int_arr_len(str2); i += 1 {
+    @int_arr_push(new_str, str2[i]);
+  }
+
+  return new_str;
+};
+
+read_input :: fn(file: string) []int {
+  str := @read_file_to_string(concat_strings("../input/", file));
+  if str == null {
+    @print_str("Can't read file");
+    exit();
+  }
+
+  return string(@unwrap(?any(str)));
+};
+
+strlen :: @int_arr_len;
+
+line_iterator :: fn(str: string, start: int) ?int {
+  if (str[start] == '\n') start += 1;
+  for i := start; i < strlen(str); i += 1 {
+    if (str[i] == '\n') return i;
+  }
+
+  return null;
+};
+
+push_char :: @int_arr_push;
+
+push_string :: fn(arr: [][]int, str: []int) {
+  @js(`arr.push(str)`);
+};
+
+lines_len :: fn(lines: [][]int) int {
+  len := 0;
+  @js("len = lines.length");
+  return len;
+};
+
+split_lines :: fn(text: []int) [][]int {
+  lines := [][]int{};
+  line := []int{};
+  start := 0;
+  for i := 0; i < strlen(text); i += 1 {
+    if text[i] == '\n' {
+      push_string(lines, line);
+      line = []int{};
+    } else {
+      push_char(line, text[i]);
+    }
+  }
+  return lines;
+};
+
+day_1 :: fn() {
+  parse_digit :: fn(str: []int, start: int, include_letters: bool) ?int {
+    if '0' <= str[start] && str[start] <= '9' {
+      return str[start] - '0';
+    }
+
+    if !include_letters return null;
+
+    if strlen(str) - start < 3 return null;
+
+    if str[start + 0] == 'o' &&
+       str[start + 1] == 'n' &&
+       str[start + 2] == 'e' return 1;
+
+    if str[start + 0] == 't' &&
+       str[start + 1] == 'w' &&
+       str[start + 2] == 'o' return 2;
+
+    if str[start + 0] == 's' &&
+       str[start + 1] == 'i' &&
+       str[start + 2] == 'x' return 6;
+
+    if strlen(str) - start < 4 return null;
+
+    if str[start + 0] == 'f' &&
+       str[start + 1] == 'o' &&
+       str[start + 2] == 'u' &&
+       str[start + 3] == 'r' return 4;
+
+    if str[start + 0] == 'f' &&
+       str[start + 1] == 'i' &&
+       str[start + 2] == 'v' &&
+       str[start + 3] == 'e' return 5;
+
+    if str[start + 0] == 'n' &&
+       str[start + 1] == 'i' &&
+       str[start + 2] == 'n' &&
+       str[start + 3] == 'e' return 9;
+
+    if strlen(str) - start < 5 return null;
+
+    if str[start + 0] == 't' &&
+       str[start + 1] == 'h' &&
+       str[start + 2] == 'r' &&
+       str[start + 3] == 'e' &&
+       str[start + 4] == 'e' return 3;
+
+    if str[start + 0] == 's' &&
+       str[start + 1] == 'e' &&
+       str[start + 2] == 'v' &&
+       str[start + 3] == 'e' &&
+       str[start + 4] == 'n' return 7;
+
+    if str[start + 0] == 'e' &&
+       str[start + 1] == 'i' &&
+       str[start + 2] == 'g' &&
+       str[start + 3] == 'h' &&
+       str[start + 4] == 't' return 8;
+
+    return null;
+  };
+
+  find_first_digit_in_line :: fn(line: string, part_2: bool) int {
+    for i := 0; i < strlen(line); i += 1 {
+      maybe_digit := parse_digit(line, i, part_2);
+      if maybe_digit != null return int(@unwrap(?any(maybe_digit)));
+    }
+    return 0;
+  };
+
+  find_last_digit_in_line :: fn(line: string, part_2: bool) int {
+    for i := strlen(line) - 1; 0 <= i; i -= 1 {
+      maybe_digit := parse_digit(line, i, part_2);
+      if maybe_digit != null return int(@unwrap(?any(maybe_digit)));
+    }
+    return 0;
+  };
+
+  input := read_input("day1");
+  lines := split_lines(input);
+
+  sum_1 := 0;
+  sum_2 := 0;
+  for i := 0; i < lines_len(lines); i += 1 {
+    sum_1 += find_first_digit_in_line(lines[i], false) * 10 + find_last_digit_in_line(lines[i], false);
+    sum_2 += find_first_digit_in_line(lines[i], true) * 10 + find_last_digit_in_line(lines[i], true);
+  }
+
+  @print_str("day.1/part.1:");
+  @print(any(sum_1));
+  @print_str("day.1/part.2:");
+  @print(any(sum_2));
+};
+
+main :: fn() {
+  day_1();
+};
+
+main();
