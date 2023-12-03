@@ -193,6 +193,7 @@ day_1 :: fn() {
 
   sum_1 := 0;
   sum_2 := 0;
+
   for i := 0; i < lines_len(lines); i += 1 {
     sum_1 += find_first_digit_in_line(lines[i], false) * 10 + find_last_digit_in_line(lines[i], false);
     sum_2 += find_first_digit_in_line(lines[i], true) * 10 + find_last_digit_in_line(lines[i], true);
@@ -249,16 +250,108 @@ day_2 :: fn() {
   }
 
 
+  @print_str([]int{});
   @print_str("day.2/part.1:");
   @print(any(game_id_sum));
   @print_str("day.2/part.2:");
   @print(any(powers_sum));
 };
 
+max :: fn(a: int, b: int) int {
+  if a <= b return b;
+  return a;
+};
+
+min :: fn(a: int, b: int) int {
+  if a <= b return a;
+  return b;
+};
+
+is_digit :: fn(char: int) bool {
+  return '0' <= char && char <= '9';
+};
+
+day_3 :: fn() {
+  input := read_input("day3");
+  lines := split_lines(input);
+
+  sum_1 := 0;
+  sum_2 := 0;
+  adjacent_star_nums := [][]int{};
+  adjacent_star_xs := []int{};
+  adjacent_star_ys := []int{};
+
+  for line_idx := 0; line_idx < lines_len(lines); line_idx += 1 { 
+    line := lines[line_idx];
+    num_str := []int{};
+    is_adjacent := false;
+    adjacent_char := ' ';
+    adjacent_x := 0;
+    adjacent_y := 0;
+
+    insert_adjacent_star_data :: fn(x: int, y: int, num: int) {
+      for i := strlen(adjacent_star_xs) - 1; 0 <= i; i -= 1 {
+        if adjacent_star_xs[i] == x && adjacent_star_ys[i] == y {
+          push_char(adjacent_star_nums[i], num);
+          return;
+        }
+      }
+
+      push_char(adjacent_star_xs, x);
+      push_char(adjacent_star_ys, y);
+      push_string(adjacent_star_nums, []int{ num });
+    };
+
+    for char_idx := 0; char_idx < strlen(line); char_idx += 1 {
+      char := line[char_idx];
+
+      if '0' <= char && char <= '9' {
+        push_char(num_str, char);
+        if !is_adjacent {
+          for adjacent_y = max(0, line_idx - 1); adjacent_y < min(line_idx + 2, lines_len(lines)); adjacent_y += 1 {
+            for adjacent_x = max(0, char_idx - 1); adjacent_x < min(char_idx + 2, strlen(lines[adjacent_y])); adjacent_x += 1 {
+              adjacent_char = lines[adjacent_y][adjacent_x];
+              if !is_digit(adjacent_char) && (adjacent_char != '.' && adjacent_char != '\n') {
+                is_adjacent = true;
+                break;
+              }
+            }
+            if is_adjacent break;
+          }
+        }
+
+        if (char_idx == strlen(line) - 1) && is_adjacent {
+          num := parse_int(num_str);
+          sum_1 += num;
+          if adjacent_char == '*' insert_adjacent_star_data(adjacent_x, adjacent_y, num);
+        }
+      } else {
+        num := parse_int(num_str);
+        if is_adjacent sum_1 += num;
+        if is_adjacent && adjacent_char == '*' insert_adjacent_star_data(adjacent_x, adjacent_y, num);
+        is_adjacent = false;
+        num_str = []int{};
+      }
+    }
+  }
+
+  for i := 0; i < strlen(adjacent_star_xs); i += 1 {
+    if strlen(adjacent_star_nums[i]) == 2 {
+      sum_2 += adjacent_star_nums[i][0] * adjacent_star_nums[i][1];
+    }
+  }
+
+  @print_str([]int{});
+  @print_str("day.3/part.1:");
+  @print(any(sum_1));
+  @print_str("day.3/part.2:");
+  @print(any(sum_2));
+};
 
 main :: fn() {
-  # day_1();
+  day_1();
   day_2();
+  day_3();
 };
 
 main();
