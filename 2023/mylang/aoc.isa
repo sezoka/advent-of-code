@@ -64,7 +64,7 @@ split :: fn(text: []int, pattern: []int) [][]int {
   for i := 0; i < strlen(text); i += 1 {
     if text[i] == pattern[0] && i + strlen(pattern) < strlen(text) {
       good := true;
-      for j := 1; j < strlen(pattern); j += 1 {
+      for j := 0; j < strlen(pattern); j += 1 {
         if text[i + j] != pattern[j] {
           good = false;
           break;
@@ -74,10 +74,10 @@ split :: fn(text: []int, pattern: []int) [][]int {
         i += strlen(pattern) - 1;
         push_string(lines, line);
         line = []int{};
+        continue;
       }
-    } else {
-      push_char(line, text[i]);
     }
+    push_char(line, text[i]);
   }
   if strlen(line) != 0 {
     push_string(lines, line);
@@ -348,10 +348,27 @@ day_3 :: fn() {
   @print(any(sum_2));
 };
 
+day_4 :: fn() {
+  input := read_input("day4");
+  lines := split_lines(input);
+
+  for line_idx := 0; line_idx < lines_len(lines); line_idx += 1 {
+    line := lines[line_idx];
+    win_cards_and_mine := split(line, " | ");
+    win_cards_temp := split(win_cards_and_mine[0], ": ");
+    win_cards := win_cards_temp[1];
+    mine_cards := win_cards_and_mine[1];
+
+    @print_str(split(win_cards, " ")[0]);
+    # @print_str(mine_cards);
+  }
+};
+
 main :: fn() {
-  day_1();
-  day_2();
-  day_3();
+  # day_1();
+  # day_2();
+  # day_3();
+  day_4();
 };
 
 main();
