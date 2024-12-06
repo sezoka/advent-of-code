@@ -19,6 +19,116 @@ pub fn main() !void {
     try aoc.run(ally, "../input/day3", day3);
     try aoc.run(ally, "../input/day4", day4);
     try aoc.run(ally, "../input/day5", day5);
+    try aoc.run(ally, "../input/day6", day6);
+}
+
+fn remove_whitespaces(ally: mem.Allocator, input: []const u8) ![]u8 {
+    var result = std.ArrayList(u8).init(ally);
+    for (input) |c| {
+        if (c != '\n') {
+            try result.append(c);
+        }
+    }
+    return result.items;
+}
+
+fn line_length(input: []const u8) usize {
+    for (input, 0..) |c, i| {
+        if (c == '\n') return i;
+    }
+    return input.len;
+}
+
+fn day6(ally: mem.Allocator, input: []const u8) !void {
+    const helpers = struct {
+        pub fn get_cell(field: []const u8, w: usize, x: usize, y: usize) u8 {
+            if (x < 0 or w <= x or y < 0 or field.len / w <= y) {
+                return 0;
+            }
+            return field[y * w + x];
+        }
+    };
+
+    const orig_field = try remove_whitespaces(ally, input);
+    const field_width = line_length(input);
+    const field_height = orig_field.len / field_width;
+    var guard_start_x: usize = 0;
+    var guard_start_y: usize = 0;
+    for (orig_field, 0..) |c, i| {
+        if (c == '^') {
+            guard_start_x = i % field_width;
+            guard_start_y = i / field_width;
+            break;
+        }
+    }
+
+    var part1_res: u32 = 0;
+    var part2_res: u32 = 0;
+    const field = try ally.alloc(u8, orig_field.len);
+    var is_first_part = true;
+    var obstacle_pos: usize = 0;
+    obstacle_placement: while (obstacle_pos < orig_field.len) : (obstacle_pos += 1) {
+        if (orig_field[obstacle_pos] != '.') continue;
+        @memcpy(field, orig_field);
+        field[obstacle_pos] = '#';
+        var guard_x = guard_start_x;
+        var guard_y = guard_start_y;
+
+        var guard_dir = helpers.get_cell(field, field_width, guard_x, guard_y);
+        while (0 < guard_x and guard_x < field_width and 0 < guard_y and guard_y < field_height) {
+            if (!is_first_part) {
+                if (field[guard_x + guard_y * field_width] == guard_dir and
+                    guard_start_x != guard_x and
+                    guard_start_y != guard_y)
+                {
+                    part2_res += 1;
+                    continue :obstacle_placement;
+                }
+            }
+
+            if (field[guard_x + guard_y * field_width] == '.') {
+                field[guard_x + guard_y * field_width] = guard_dir;
+            }
+            var next_pos_x = guard_x;
+            var next_pos_y = guard_y;
+            switch (guard_dir) {
+                '^' => next_pos_y = guard_y - 1,
+                'v' => next_pos_y = guard_y + 1,
+                '<' => next_pos_x = guard_x - 1,
+                '>' => next_pos_x = guard_x + 1,
+                else => unreachable,
+            }
+            const next_pos_cell = helpers.get_cell(field, field_width, next_pos_x, next_pos_y);
+            switch (next_pos_cell) {
+                '#' => {
+                    switch (guard_dir) {
+                        '^' => guard_dir = '>',
+                        'v' => guard_dir = '<',
+                        '<' => guard_dir = '^',
+                        '>' => guard_dir = 'v',
+                        else => unreachable,
+                    }
+                },
+                0 => {
+                    break;
+                },
+                else => {
+                    guard_x = next_pos_x;
+                    guard_y = next_pos_y;
+                },
+            }
+        }
+        field[guard_x + guard_y * field_width] = guard_dir;
+
+        if (is_first_part) {
+            for (field) |c| {
+                if (c != '.' and c != '#') part1_res += 1;
+            }
+            is_first_part = false;
+        }
+    }
+
+    try stdout.print("part1: {d}, part2: {d}\n", .{ part1_res, part2_res });
 }
 
 fn day5(ally: mem.Allocator, input: []const u8) !void {
