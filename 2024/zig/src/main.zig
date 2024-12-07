@@ -20,7 +20,63 @@ pub fn main() !void {
     try aoc.run(ally, "../input/day4", day4);
     try aoc.run(ally, "../input/day5", day5);
     try aoc.run(ally, "../input/day6", day6);
+    try aoc.run(ally, "../input/day7", day7.solution);
 }
+
+fn concat_nums(T: type, a: T, b: T) T {
+    var tens: T = 1;
+    var tmp = b;
+    while (tmp != 0) {
+        tens *= 10;
+        tmp /= 10;
+    }
+    return a * tens + b;
+}
+
+const day7 = struct {
+    pub fn check_recursive(items: []u32, expect: u64, is_second_part: bool, result: u64) bool {
+        if (items.len == 0) return result == expect;
+        const plus = result + items[0];
+        if (check_recursive(items[1..], expect, is_second_part, plus))
+            return true;
+        const mult = result * items[0];
+        if (check_recursive(items[1..], expect, is_second_part, mult))
+            return true;
+        if (is_second_part) {
+            const concat = concat_nums(u64, result, items[0]);
+            if (check_recursive(items[1..], expect, is_second_part, concat))
+                return true;
+        }
+        return false;
+    }
+
+    pub fn solution(ally: mem.Allocator, input: []const u8) !void {
+        var lines_iter = mem.splitScalar(u8, input[0 .. input.len - 1], '\n');
+        var part1_res: u64 = 0;
+        var part2_res: u64 = 0;
+        while (lines_iter.next()) |line| {
+            var colon_idx: u32 = 0;
+            while (line[colon_idx] != ':') colon_idx += 1;
+            const equation_result_str = line[0..colon_idx];
+            const equation_result = try fmt.parseInt(u64, equation_result_str, 10);
+            var numbers_iter = mem.splitScalar(u8, line[colon_idx + 2 .. line.len], ' ');
+            var nums = std.ArrayList(u32).init(ally);
+            while (numbers_iter.next()) |num_str| {
+                const num = try fmt.parseInt(u16, num_str, 10);
+                try nums.append(num);
+            }
+
+            if (check_recursive(nums.items, equation_result, false, 0)) {
+                part1_res += equation_result;
+            }
+            if (check_recursive(nums.items, equation_result, true, 0)) {
+                part2_res += equation_result;
+            }
+        }
+
+        try stdout.print("part1: {d}, part2: {d}\n", .{ part1_res, part2_res });
+    }
+};
 
 fn remove_whitespaces(ally: mem.Allocator, input: []const u8) ![]u8 {
     var result = std.ArrayList(u8).init(ally);
