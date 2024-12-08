@@ -109,6 +109,147 @@ function day5(input) {
     console.log(`part1: ${part1_res}, part2: ${part2_res}\n`);
 }
 
+function day6(input) {
+    function getCell(field, w, x, y) {
+        if (x < 0 || w <= x || y < 0 || field.length / w <= y) {
+            return "\0";
+        }
+        return field[y * w + x];
+    }
+
+    function removeWhitespaces(input) {
+        const result = [];
+        for (const c of input) {
+            if (c !== '\n') {
+                result.push(c);
+            }
+        }
+        return result;
+    }
+
+    function lineLength(input) {
+        for (let i = 0; i < input.length; i++) {
+            if (input[i] === "\n") {
+                return i;
+            }
+        }
+        return input.length;
+    }
+
+    const origField = removeWhitespaces(input);
+    const fieldWidth = lineLength(input);
+    const fieldHeight = origField.length / fieldWidth;
+    let guardStartX = 0;
+    let guardStartY = 0;
+
+    for (let i = 0; i < origField.length; i++) {
+        if (origField[i] === "^") {
+            guardStartX = i % fieldWidth;
+            guardStartY = Math.floor(i / fieldWidth);
+        }
+    }
+
+    let part1Res = 0;
+    let part2Res = 0;
+    const field = Array(origField.length).fill();
+    let isFirstPart = true;
+
+    outer: for (let obstaclePos = 0; obstaclePos < origField.length; obstaclePos++) {
+        if (origField[obstaclePos] !== ".") {
+            continue;
+        }
+        for (let i = 0; i < field.length; i++) {
+            field[i] = origField[i];
+        }
+        field[obstaclePos] = "#";
+        let guardX = guardStartX;
+        let guardY = guardStartY;
+        let guardDir = getCell(field, fieldWidth, guardX, guardY);
+
+        inner: while (
+            guardX > 0 &&
+            guardX < fieldWidth &&
+            guardY > 0 &&
+            guardY < fieldHeight
+        ) {
+            if (!isFirstPart) {
+                if (
+                    field[guardX + guardY * fieldWidth] === guardDir &&
+                    guardStartX !== guardX &&
+                    guardStartY !== guardY
+                ) {
+                    part2Res += 1;
+                    continue outer;
+                }
+            }
+
+            if (field[guardX + guardY * fieldWidth] === ".") {
+                field[guardX + guardY * fieldWidth] = guardDir;
+            }
+
+            let nextPosX = guardX;
+            let nextPosY = guardY;
+
+            switch (guardDir) {
+                case "^":
+                    nextPosY = guardY - 1;
+                    break;
+                case "v":
+                    nextPosY = guardY + 1;
+                    break;
+                case "<":
+                    nextPosX = guardX - 1;
+                    break;
+                case ">":
+                    nextPosX = guardX + 1;
+                    break;
+                default:
+                    console.log(guardDir);
+                    throw new Error("Unexpected direction");
+            }
+
+            const nextPosCell = getCell(field, fieldWidth, nextPosX, nextPosY);
+            switch (nextPosCell) {
+                case "#":
+                    switch (guardDir) {
+                        case "^":
+                            guardDir = ">";
+                            break;
+                        case "v":
+                            guardDir = "<";
+                            break;
+                        case "<":
+                            guardDir = "^";
+                            break;
+                        case ">":
+                            guardDir = "v";
+                            break;
+                    }
+                    break;
+                case "\0":
+                    break inner;
+                default:
+                    guardX = nextPosX;
+                    guardY = nextPosY;
+            }
+        }
+
+        field[guardX + guardY * fieldWidth] = guardDir;
+
+        if (isFirstPart) {
+            for (const c of field) {
+                if (c !== "." && c !== "#") {
+                    part1Res += 1;
+                }
+            }
+            isFirstPart = false;
+        }
+    }
+
+    console.log(`part1: ${part1Res}, part2: ${part2Res}\n`);
+}
+
 // run("../input/day1", day1);
-run("../input/day5", day5);
+// run("../input/day5", day5);
+run("../input/day6", day6);
 

@@ -14,13 +14,98 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const ally = gpa.allocator();
 
-    try aoc.run(ally, "../input/day1", day1.solution);
-    try aoc.run(ally, "../input/day2", day2.solution);
-    try aoc.run(ally, "../input/day3", day3.solution);
-    try aoc.run(ally, "../input/day4", day4.solution);
-    try aoc.run(ally, "../input/day5", day5.solution);
-    try aoc.run(ally, "../input/day6", day6.solution);
-    try aoc.run(ally, "../input/day7", day7.solution);
+    // try aoc.run(ally, "../input/day1", day1.solution);
+    // try aoc.run(ally, "../input/day2", day2.solution);
+    // try aoc.run(ally, "../input/day3", day3.solution);
+    // try aoc.run(ally, "../input/day4", day4.solution);
+    // try aoc.run(ally, "../input/day5", day5.solution);
+    // try aoc.run(ally, "../input/day6", day6.solution);
+    // try aoc.run(ally, "../input/day7", day7.solution);
+    try aoc.run(ally, "../input/day8", day8.solution);
+}
+
+const day8 = struct {
+    const Pos = struct {
+        x: i32,
+        y: i32,
+    };
+
+    fn set_cell(field: []u8, w: i32, x: i32, y: i32, antena: u8, val: u8, is_part_2: bool) void {
+        if (x < 0 or w <= x or y < 0 or @divTrunc(@as(i32, @intCast(field.len)), w) <= y) {
+            return;
+        }
+        const cell = &field[@intCast(y * w + x)];
+        if (cell.* == antena and !is_part_2) return;
+        cell.* = val;
+    }
+
+    pub fn solution(ally: mem.Allocator, input: []const u8) !void {
+        const field_width = line_length(input);
+        const part1_field = try remove_whitespaces(ally, input);
+        const part2_field = try ally.dupe(u8, part1_field);
+        var antenna_to_position = std.AutoHashMap(u8, std.ArrayList(Pos)).init(ally);
+        for (0..part1_field.len) |i| {
+            const antenna = part1_field[i];
+            if (antenna == '.') continue;
+            const x = i % field_width;
+            const y = i / field_width;
+            const gop = try antenna_to_position.getOrPut(antenna);
+            if (!gop.found_existing) {
+                gop.value_ptr.* = std.ArrayList(Pos).init(ally);
+            }
+            try gop.value_ptr.append(.{ .x = @intCast(x), .y = @intCast(y) });
+        }
+
+        var antenas_iter = antenna_to_position.iterator();
+        while (antenas_iter.next()) |antena| {
+            const positions = antena.value_ptr;
+            for (positions.items) |a_pos| {
+                for (positions.items) |b_pos| {
+                    const x_distance = b_pos.x - a_pos.x;
+                    const y_distance = b_pos.y - a_pos.y;
+                    var antinode_x = b_pos.x;
+                    var antinode_y = b_pos.y;
+                    set_cell(part1_field, @intCast(field_width), antinode_x + x_distance, antinode_y + y_distance, antena.key_ptr.*, '#', false);
+                    if (x_distance < 1 and y_distance < 1) continue;
+
+                    while ((0 <= antinode_x and 0 <= antinode_y) and
+                        (antinode_x <= field_width and antinode_y <= field_width))
+                    {
+                        antinode_x -= x_distance;
+                        antinode_y -= y_distance;
+                    }
+
+                    antinode_x += x_distance;
+                    antinode_y += y_distance;
+
+                    while ((0 <= antinode_x and 0 <= antinode_y) and
+                        (antinode_x <= field_width and antinode_y <= field_width))
+                    {
+                        set_cell(part2_field, @intCast(field_width), antinode_x, antinode_y, antena.key_ptr.*, '#', true);
+                        antinode_x += x_distance;
+                        antinode_y += y_distance;
+                    }
+                }
+            }
+        }
+
+        var part1_res: u32 = 0;
+        var part2_res: u32 = 0;
+
+        for (part1_field, part2_field) |part1_cell, part2_cell| {
+            if (part1_cell == '#') part1_res += 1;
+            if (part2_cell == '#') part2_res += 1;
+        }
+
+        try stdout.print("part1: {d}, part2: {d}\n", .{ part1_res, part2_res });
+    }
+};
+
+fn get_cell(field: []const u8, w: usize, x: usize, y: usize) u8 {
+    if (x < 0 or w <= x or y < 0 or field.len / w <= y) {
+        return 0;
+    }
+    return field[y * w + x];
 }
 
 fn concat_nums(T: type, a: T, b: T) T {
@@ -93,13 +178,6 @@ fn line_length(input: []const u8) usize {
 }
 
 const day6 = struct {
-    fn get_cell(field: []const u8, w: usize, x: usize, y: usize) u8 {
-        if (x < 0 or w <= x or y < 0 or field.len / w <= y) {
-            return 0;
-        }
-        return field[y * w + x];
-    }
-
     fn solution(ally: mem.Allocator, input: []const u8) !void {
         const orig_field = try remove_whitespaces(ally, input);
         const field_width = line_length(input);
