@@ -6,6 +6,7 @@ const fmt = std.fmt;
 const sort = std.sort;
 const math = std.math;
 const simd = std.simd;
+const debug = std.debug;
 
 const stdout = io.getStdOut().writer();
 
@@ -14,15 +15,153 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const ally = gpa.allocator();
 
-    // try aoc.run(ally, "../input/day1", day1.solution);
-    // try aoc.run(ally, "../input/day2", day2.solution);
-    // try aoc.run(ally, "../input/day3", day3.solution);
-    // try aoc.run(ally, "../input/day4", day4.solution);
-    // try aoc.run(ally, "../input/day5", day5.solution);
-    // try aoc.run(ally, "../input/day6", day6.solution);
-    // try aoc.run(ally, "../input/day7", day7.solution);
+    try aoc.run(ally, "../input/day1", day1.solution);
+    try aoc.run(ally, "../input/day2", day2.solution);
+    try aoc.run(ally, "../input/day3", day3.solution);
+    try aoc.run(ally, "../input/day4", day4.solution);
+    try aoc.run(ally, "../input/day5", day5.solution);
+    try aoc.run(ally, "../input/day6", day6.solution);
+    try aoc.run(ally, "../input/day7", day7.solution);
     try aoc.run(ally, "../input/day8", day8.solution);
+    try aoc.run(ally, "../input/day9", day9.solution);
+    try aoc.run(ally, "../input/day10", day10.solution);
 }
+
+const day10 = struct {
+    const Point = struct { x: i16, y: i16 };
+
+    fn dfs(field: []u8, w: usize, x: i16, y: i16, visited: *std.AutoHashMap(Point, void), is_part2: bool) !u8 {
+        if (!visited.contains(.{ .x = x, .y = y })) {
+            try visited.put(.{ .x = x, .y = y }, {});
+            const center = get_cell_u16(field, w, x, y);
+            if (center == '9') {
+                return 1;
+            }
+            var result: u8 = 0;
+            if (get_cell_u16(field, w, x, y - 1) - center == 1)
+                result += try dfs(field, w, @intCast(x), @intCast(y - 1), visited, is_part2);
+            if (is_part2) visited.clearRetainingCapacity();
+            if (get_cell_u16(field, w, x + 1, y) - center == 1)
+                result += try dfs(field, w, @intCast(x + 1), @intCast(y), visited, is_part2);
+            if (is_part2) visited.clearRetainingCapacity();
+            if (get_cell_u16(field, w, x, y + 1) - center == 1)
+                result += try dfs(field, w, @intCast(x), @intCast(y + 1), visited, is_part2);
+            if (is_part2) visited.clearRetainingCapacity();
+            if (get_cell_u16(field, w, x - 1, y) - center == 1)
+                result += try dfs(field, w, @intCast(x - 1), @intCast(y), visited, is_part2);
+            if (is_part2) visited.clearRetainingCapacity();
+            return result;
+        }
+        return 0;
+    }
+
+    fn is_cell_exists(field: []const u8, w: usize, x: i16, y: i16) bool {
+        return !(x < 0 or w <= x or y < 0 or field.len / w <= y);
+    }
+
+    fn get_cell_u16(field: []const u8, w: usize, x: i16, y: i16) i8 {
+        if (!is_cell_exists(field, w, x, y)) {
+            return -1;
+        }
+        return @intCast(field[@as(usize, @intCast(x)) + @as(usize, @intCast(y)) * w]);
+    }
+
+    pub fn solution(ally: mem.Allocator, input: []const u8) !void {
+        const field = try remove_whitespaces(ally, input);
+        const field_width = get_line_len(input);
+
+        var visited_nodes = std.AutoHashMap(Point, void).init(ally);
+        var part1_res: usize = 0;
+        var part2_res: usize = 0;
+        for (field, 0..) |cell, i| {
+            if (cell == '0') {
+                const x = i % field_width;
+                const y = i / field_width;
+                part1_res += try dfs(field, field_width, @intCast(x), @intCast(y), &visited_nodes, false);
+                visited_nodes.clearRetainingCapacity();
+                part2_res += try dfs(field, field_width, @intCast(x), @intCast(y), &visited_nodes, true);
+                visited_nodes.clearRetainingCapacity();
+            }
+        }
+
+        debug.assert(part1_res == 531);
+        debug.assert(part2_res == 1210);
+
+        try stdout.print("part1: {d}, part2: {d}\n", .{ part1_res, part2_res });
+    }
+};
+
+const day9 = struct {
+    pub fn solution(ally: mem.Allocator, input: []const u8) !void {
+        var disk = std.ArrayList(isize).init(ally);
+
+        var is_free_space = false;
+        for (0..input.len - 1) |block_id| {
+            const file_id = block_id / 2;
+            const file_size = try fmt.parseInt(u8, input[block_id .. block_id + 1], 10);
+            if (is_free_space) {
+                for (0..file_size) |_| {
+                    try disk.append(-69);
+                }
+            } else {
+                for (0..file_size) |_| {
+                    try disk.append(@intCast(file_id));
+                }
+            }
+            is_free_space = !is_free_space;
+        }
+
+        var file_block_idx: isize = @as(isize, @intCast(disk.items.len)) - 1;
+        var db_cnt: u32 = 0;
+        outer: while (true) {
+            while (0 < file_block_idx and disk.items[@intCast(file_block_idx)] < 0) file_block_idx -= 1;
+            if (file_block_idx < 0) break;
+            const file_id = disk.items[@intCast(file_block_idx)];
+            var file_size: isize = 0;
+            while (0 < file_block_idx - file_size and
+                file_id == disk.items[@intCast(file_block_idx - file_size)]) file_size += 1;
+            if (file_block_idx - file_size < 0) break;
+
+            var empty_block_idx: isize = 0;
+            while (true) {
+                db_cnt += 1;
+                while (0 <= disk.items[@intCast(empty_block_idx)]) empty_block_idx += 1;
+                var empty_block_size: isize = 0;
+                while (empty_block_idx + empty_block_size < disk.items.len and
+                    disk.items[@intCast(empty_block_idx + empty_block_size)] < 0) empty_block_size += 1;
+                if (disk.items.len < empty_block_idx + empty_block_size) {
+                    while (disk.items[@intCast(file_block_idx)] == file_id) file_block_idx -= 1;
+                    continue :outer;
+                }
+
+                if (file_block_idx < empty_block_idx) {
+                    while (0 <= file_block_idx and disk.items[@intCast(file_block_idx)] == file_id) file_block_idx -= 1;
+                    continue :outer;
+                }
+                if (file_size <= empty_block_size) {
+                    for (disk.items[@intCast(empty_block_idx)..@intCast(empty_block_idx + file_size)]) |*item| {
+                        item.* = file_id;
+                    }
+                    for (disk.items[@intCast(file_block_idx - file_size + 1)..@intCast(file_block_idx + 1)]) |*item| {
+                        item.* = -69;
+                    }
+                    break;
+                } else {
+                    empty_block_idx += 1;
+                    continue;
+                }
+            }
+        }
+
+        var part1_res: usize = 0;
+        for (disk.items, 0..) |id, pos|
+            if (0 <= id) {
+                part1_res += @as(usize, @intCast(id)) * pos;
+            };
+
+        try stdout.print("part1: {d}, part2: {d}\n", .{ part1_res, part1_res });
+    }
+};
 
 const day8 = struct {
     const Pos = struct {
@@ -40,7 +179,7 @@ const day8 = struct {
     }
 
     pub fn solution(ally: mem.Allocator, input: []const u8) !void {
-        const field_width = line_length(input);
+        const field_width = get_line_len(input);
         const part1_field = try remove_whitespaces(ally, input);
         const part2_field = try ally.dupe(u8, part1_field);
         var antenna_to_position = std.AutoHashMap(u8, std.ArrayList(Pos)).init(ally);
@@ -65,7 +204,15 @@ const day8 = struct {
                     const y_distance = b_pos.y - a_pos.y;
                     var antinode_x = b_pos.x;
                     var antinode_y = b_pos.y;
-                    set_cell(part1_field, @intCast(field_width), antinode_x + x_distance, antinode_y + y_distance, antena.key_ptr.*, '#', false);
+                    set_cell(
+                        part1_field,
+                        @intCast(field_width),
+                        antinode_x + x_distance,
+                        antinode_y + y_distance,
+                        antena.key_ptr.*,
+                        '#',
+                        false,
+                    );
                     if (x_distance < 1 and y_distance < 1) continue;
 
                     while ((0 <= antinode_x and 0 <= antinode_y) and
@@ -119,16 +266,15 @@ fn concat_nums(T: type, a: T, b: T) T {
 }
 
 const day7 = struct {
-    fn check_recursive(items: []u32, expect: u64, result: u64) u8 {
-        if (items.len == 0) return @intFromBool(result == expect);
-        const plus_res = check_recursive(items[1..], expect, result + items[0]);
-        if (plus_res != 0) return plus_res;
-        const mult_res = check_recursive(items[1..], expect, result * items[0]);
-        if (mult_res != 0) return mult_res;
-        const concat = concat_nums(u64, result, items[0]);
-        if (check_recursive(items[1..], expect, concat) != 0)
-            return 2;
-        return 0;
+    fn check(items: []u32, expect: u64, result: u64, is_part2: bool) bool {
+        if (items.len == 0) return expect == result;
+        if (check(items[1..], expect, result + items[0], is_part2)) return true;
+        if (check(items[1..], expect, result * items[0], is_part2)) return true;
+        if (is_part2) {
+            if (check(items[1..], expect, concat_nums(u64, result, items[0]), is_part2))
+                return true;
+        }
+        return false;
     }
 
     pub fn solution(ally: mem.Allocator, input: []const u8) !void {
@@ -147,15 +293,16 @@ const day7 = struct {
                 try nums.append(num);
             }
 
-            const res = check_recursive(nums.items, equation_result, 0);
-            if (res == 1) {
+            if (check(nums.items, equation_result, 0, false)) {
                 part1_res += equation_result;
-                part2_res += equation_result;
-            } else if (res == 2) {
+            }
+            if (check(nums.items, equation_result, 0, true)) {
                 part2_res += equation_result;
             }
         }
 
+        debug.assert(part1_res == 1298103531759);
+        debug.assert(part2_res == 140575048428831);
         try stdout.print("part1: {d}, part2: {d}\n", .{ part1_res, part2_res });
     }
 };
@@ -170,7 +317,7 @@ fn remove_whitespaces(ally: mem.Allocator, input: []const u8) ![]u8 {
     return result.items;
 }
 
-fn line_length(input: []const u8) usize {
+fn get_line_len(input: []const u8) usize {
     for (input, 0..) |c, i| {
         if (c == '\n') return i;
     }
@@ -180,7 +327,7 @@ fn line_length(input: []const u8) usize {
 const day6 = struct {
     fn solution(ally: mem.Allocator, input: []const u8) !void {
         const orig_field = try remove_whitespaces(ally, input);
-        const field_width = line_length(input);
+        const field_width = get_line_len(input);
         const field_height = orig_field.len / field_width;
         var guard_start_x: usize = 0;
         var guard_start_y: usize = 0;
@@ -258,6 +405,8 @@ const day6 = struct {
             }
         }
 
+        debug.assert(part1_res == 4776);
+        debug.assert(part2_res == 1586);
         try stdout.print("part1: {d}, part2: {d}\n", .{ part1_res, part2_res });
     }
 };
@@ -304,6 +453,8 @@ const day5 = struct {
             part1_res += middle;
         }
 
+        debug.assert(part1_res == 6242);
+        debug.assert(part2_res == 5169);
         try stdout.print("part1: {d}, part2: {d}\n", .{ part1_res, part2_res });
     }
 };
@@ -374,14 +525,16 @@ const day4 = struct {
             }
         }
 
+        debug.assert(part1_res == 2642);
+        debug.assert(part2_res == 1974);
         try stdout.print("part1: {d}, part2: {d}\n", .{ part1_res, part2_res });
     }
 };
 
 const day3 = struct {
     pub fn solution(_: mem.Allocator, input: []const u8) !void {
-        var part_1_res: usize = 0;
-        var part_2_res: usize = 0;
+        var part1_res: usize = 0;
+        var part2_res: usize = 0;
         var i: usize = 0;
         var enabled = true;
         while (i < input.len) : (i += 1) {
@@ -420,13 +573,15 @@ const day3 = struct {
                     continue;
                 }
                 const sum = try fmt.parseInt(usize, x, 10) * try fmt.parseInt(usize, y, 10);
-                part_1_res += sum;
+                part1_res += sum;
                 if (enabled) {
-                    part_2_res += sum;
+                    part2_res += sum;
                 }
             }
         }
-        try stdout.print("part1: {d}, part2: {d}\n", .{ part_1_res, part_2_res });
+        debug.assert(part1_res == 187194524);
+        debug.assert(part2_res == 127092535);
+        try stdout.print("part1: {d}, part2: {d}\n", .{ part1_res, part2_res });
     }
 };
 
@@ -476,6 +631,10 @@ const day2 = struct {
                 }
             }
         }
+        const part1_res = safe_reports;
+        const part2_res = safe_reports + reports_that_can_be_fixed;
+        debug.assert(part1_res == 686);
+        debug.assert(part2_res == 717);
         try stdout.print("part1: {d}, part2: {d}\n", .{ safe_reports, safe_reports + reports_that_can_be_fixed });
     }
 };
@@ -509,6 +668,8 @@ const day1 = struct {
         for (right_list) |num| cnt_map[@intCast(num)] += 1;
         var part2_res: i32 = 0;
         for (left_list) |num| part2_res += num * cnt_map[@intCast(num)];
+        debug.assert(part1_res == 1889772);
+        debug.assert(part2_res == 23228917);
         try stdout.print("part1: {d}, part2: {d}\n", .{ part1_res, part2_res });
     }
 };
