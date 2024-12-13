@@ -11,7 +11,7 @@ pub fn read_input(ally: mem.Allocator, file_path: []const u8) []const u8 {
     const file_size_limit = 4024000;
     return fs.cwd().readFileAlloc(ally, file_path, file_size_limit) catch |err| {
         switch (err) {
-            error.OutOfMemory => log.err("Just by more ram", .{}),
+            error.OutOfMemory => log.err("Just buy more ram", .{}),
             error.FileNotFound => log.err("File '{s}' not found", .{file_path}),
             error.FileTooBig => log.err("File '{s}' is too large", .{file_path}),
             else => log.err("Failed to read file '{s}. Error: {}", .{ file_path, err }),

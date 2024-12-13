@@ -4,6 +4,8 @@ const fmt = std.fmt;
 const sort = std.sort;
 const math = std.math;
 const simd = std.simd;
+const ascii = std.ascii;
+
 const debug = std.debug;
 const io = std.io;
 
@@ -19,18 +21,73 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const ally = gpa.allocator();
 
-    // try aoc.run(ally, "../input/day1", day1.solution);
-    // try aoc.run(ally, "../input/day2", day2.solution);
-    // try aoc.run(ally, "../input/day3", day3.solution);
-    // try aoc.run(ally, "../input/day4", day4.solution);
-    // try aoc.run(ally, "../input/day5", day5.solution);
-    // try aoc.run(ally, "../input/day6", day6.solution);
-    // try aoc.run(ally, "../input/day7", day7.solution);
-    // try aoc.run(ally, "../input/day8", day8.solution);
-    // try aoc.run(ally, "../input/day9", day9.solution);
-    // try aoc.run(ally, "../input/day10", day10.solution);
-    // try aoc.run(ally, "../input/day11", comptime day11.solution);
-    try aoc.run(ally, "../input/day12", comptime day12.solution);
+    try aoc.run(ally, "../input/day1", day1.solution);
+    try aoc.run(ally, "../input/day2", day2.solution);
+    try aoc.run(ally, "../input/day3", day3.solution);
+    try aoc.run(ally, "../input/day4", day4.solution);
+    try aoc.run(ally, "../input/day5", day5.solution);
+    try aoc.run(ally, "../input/day6", day6.solution);
+    try aoc.run(ally, "../input/day7", day7.solution);
+    try aoc.run(ally, "../input/day8", day8.solution);
+    try aoc.run(ally, "../input/day9", day9.solution);
+    try aoc.run(ally, "../input/day10", day10.solution);
+    try aoc.run(ally, "../input/day11", day11.solution);
+    try aoc.run(ally, "../input/day12", day12.solution);
+    try aoc.run(ally, "../input/day13", day13.solution);
+}
+
+const day13 = struct {
+    fn calculate_cost_in_tokens(
+        a_x: i64,
+        a_y: i64,
+        b_x: i64,
+        b_y: i64,
+        prize_x: i64,
+        prize_y: i64,
+    ) i64 {
+        const det = (a_x * b_y - b_x * a_y);
+        const a = @divTrunc((b_y * prize_x - b_x * prize_y), det);
+        const b = @divTrunc((a_x * prize_y - a_y * prize_x), det);
+        if (a_x * a + b_x * b == prize_x and a_y * a + b_y * b == prize_y)
+            return a * 3 + b;
+        return 0;
+    }
+
+    fn solution(_: mem.Allocator, input: []const u8) !void {
+        var lines_iter = mem.splitScalar(u8, input[0 .. input.len - 1], '\n');
+        var part1_res: i64 = 0;
+        var part2_res: i64 = 0;
+        while (true) {
+            var line = lines_iter.next() orelse break;
+            const btn_a_x = int_from_slice(i64, line[12..14]);
+            const btn_a_y = int_from_slice(i64, line[18..]);
+            line = lines_iter.next().?;
+            const btn_b_x = int_from_slice(i64, line[12..14]);
+            const btn_b_y = int_from_slice(i64, line[18..]);
+            line = lines_iter.next().?;
+            const prize_x = int_from_slice(i64, line[9..14]);
+            const prize_y = int_from_slice(i64, line[15..]);
+
+            part1_res += calculate_cost_in_tokens(btn_a_x, btn_a_y, btn_b_x, btn_b_y, prize_x, prize_y);
+            part2_res += calculate_cost_in_tokens(btn_a_x, btn_a_y, btn_b_x, btn_b_y, prize_x + 10000000000000, prize_y + 10000000000000);
+
+            _ = lines_iter.next();
+        }
+
+        debug.assert(part1_res == 33427);
+        debug.assert(part2_res == 91649162972270);
+
+        try stdout.print("part1: {d}, part2: {d}\n", .{ part1_res, part2_res });
+    }
+};
+
+fn int_from_slice(T: type, slice: []const u8) T {
+    debug.assert(slice.len != 0);
+    var start: usize = 0;
+    var end: usize = slice.len - 1;
+    while (!ascii.isDigit(slice[start])) start += 1;
+    while (!ascii.isDigit(slice[end])) end -= 1;
+    return fmt.parseInt(T, slice[start .. end + 1], 10) catch unreachable;
 }
 
 const Direction = enum {
