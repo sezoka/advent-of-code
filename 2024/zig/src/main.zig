@@ -1,31 +1,253 @@
 const std = @import("std");
-const aoc = @import("aoc.zig");
 const mem = std.mem;
-const io = std.io;
 const fmt = std.fmt;
 const sort = std.sort;
 const math = std.math;
 const simd = std.simd;
 const debug = std.debug;
+const io = std.io;
+
+const aoc = @import("aoc.zig");
 
 const stdout = io.getStdOut().writer();
+
+var stoudbuff = io.BufferedWriter(20480, @TypeOf(stdout)){ .unbuffered_writer = stdout };
+const buffwriter = stoudbuff.writer();
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const ally = gpa.allocator();
 
-    try aoc.run(ally, "../input/day1", day1.solution);
-    try aoc.run(ally, "../input/day2", day2.solution);
-    try aoc.run(ally, "../input/day3", day3.solution);
-    try aoc.run(ally, "../input/day4", day4.solution);
-    try aoc.run(ally, "../input/day5", day5.solution);
-    try aoc.run(ally, "../input/day6", day6.solution);
-    try aoc.run(ally, "../input/day7", day7.solution);
-    try aoc.run(ally, "../input/day8", day8.solution);
-    try aoc.run(ally, "../input/day9", day9.solution);
-    try aoc.run(ally, "../input/day10", day10.solution);
+    // try aoc.run(ally, "../input/day1", day1.solution);
+    // try aoc.run(ally, "../input/day2", day2.solution);
+    // try aoc.run(ally, "../input/day3", day3.solution);
+    // try aoc.run(ally, "../input/day4", day4.solution);
+    // try aoc.run(ally, "../input/day5", day5.solution);
+    // try aoc.run(ally, "../input/day6", day6.solution);
+    // try aoc.run(ally, "../input/day7", day7.solution);
+    // try aoc.run(ally, "../input/day8", day8.solution);
+    // try aoc.run(ally, "../input/day9", day9.solution);
+    // try aoc.run(ally, "../input/day10", day10.solution);
+    // try aoc.run(ally, "../input/day11", comptime day11.solution);
+    try aoc.run(ally, "../input/day12", comptime day12.solution);
 }
+
+const Direction = enum {
+    up,
+    right,
+    down,
+    left,
+};
+
+fn turn_left(dir: Direction) Direction {
+    return switch (dir) {
+        .up => .left,
+        .left => .down,
+        .down => .right,
+        .right => .up,
+    };
+}
+
+fn turn_right(dir: Direction) Direction {
+    return switch (dir) {
+        .up => .right,
+        .right => .down,
+        .down => .left,
+        .left => .up,
+    };
+}
+
+const Vec2 = struct {
+    x: isize,
+    y: isize,
+};
+
+fn next_coord_by_dir(dir: Direction, x: isize, y: isize) Vec2 {
+    var new_x: isize = x;
+    var new_y: isize = y;
+    switch (dir) {
+        .left => new_x -= 1,
+        .right => new_x += 1,
+        .up => new_y -= 1,
+        .down => new_y += 1,
+    }
+    return .{ .x = new_x, .y = new_y };
+}
+
+const day12 = struct {
+    const Plant = struct { name: u8, area: u32, perimeter: u32, sides: u32 };
+
+    const Visited = std.AutoHashMap(struct { x: isize, y: isize }, void);
+
+    fn check_is_corner(field: []u8, w: usize, x: isize, y: isize, plant: u8) u32 {
+        const top_left = get_cell(field, w, x - 1, y - 1) == plant;
+        const top = get_cell(field, w, x, y - 1) == plant;
+        const top_right = get_cell(field, w, x + 1, y - 1) == plant;
+        const left = get_cell(field, w, x - 1, y) == plant;
+        const right = get_cell(field, w, x + 1, y) == plant;
+        const bottom_left = get_cell(field, w, x - 1, y + 1) == plant;
+        const bottom = get_cell(field, w, x, y + 1) == plant;
+        const bottom_right = get_cell(field, w, x + 1, y + 1) == plant;
+
+        var corners: u32 = 0;
+        if (left and top and !top_left) corners += 1;
+        if (left and bottom and !bottom_left) corners += 1;
+        if (top and right and !top_right) corners += 1;
+        if (right and bottom and !bottom_right) corners += 1;
+        if (!top and !right) corners += 1;
+        if (!right and !bottom) corners += 1;
+        if (!bottom and !left) corners += 1;
+        if (!left and !top) corners += 1;
+
+        return corners;
+    }
+
+    fn measure_garden(
+        visited: *Visited,
+        plant: *Plant,
+        field: []u8,
+        w: usize,
+        x: isize,
+        y: isize,
+    ) !void {
+        const is_outside_of_field = get_cell(field, w, x, y) != plant.name;
+        if (is_outside_of_field) {
+            plant.sides += check_is_corner(field, w, x, y, plant.name);
+            plant.perimeter += 1;
+        }
+        if (is_outside_of_field or visited.contains(.{ .x = x, .y = y })) {
+            return;
+        }
+
+        try visited.put(.{ .x = x, .y = y }, {});
+        plant.area += 1;
+
+        try measure_garden(visited, plant, field, w, x - 1, y);
+        try measure_garden(visited, plant, field, w, x + 1, y);
+        try measure_garden(visited, plant, field, w, x, y - 1);
+        try measure_garden(visited, plant, field, w, x, y + 1);
+    }
+
+    fn solution(ally: mem.Allocator, input: []const u8) !void {
+        const field = try remove_whitespaces(ally, input);
+        const field_width: isize = @intCast(get_line_len(input));
+
+        var visited = Visited.init(ally);
+        var plants = std.ArrayList(Plant).init(ally);
+
+        for (field, 0..) |plant_name, i| {
+            const x = @rem(@as(isize, @intCast(i)), field_width);
+            const y = @divTrunc(@as(isize, @intCast(i)), field_width);
+            if (visited.contains(.{ .x = x, .y = y })) {
+                continue;
+            }
+
+            var plant: Plant = .{
+                .name = plant_name,
+                .perimeter = 0,
+                .area = 0,
+                .sides = 0,
+            };
+
+            try measure_garden(&visited, &plant, field, @intCast(field_width), x, y);
+            try plants.append(plant);
+        }
+
+        var part1_res: u32 = 0;
+        var part2_res: u32 = 0;
+        for (plants.items) |p| {
+            part1_res += p.area * p.perimeter;
+            part2_res += p.area * p.sides;
+        }
+
+        debug.assert(part1_res == 1402544);
+        debug.assert(part2_res == 862486);
+
+        try stdout.print("part1: {d}, part2: {d}\n", .{ part1_res, part2_res });
+    }
+};
+
+fn set_cell(field: []u8, w: isize, x: isize, y: isize, val: u8) void {
+    if (x < 0 or w <= x or y < 0 or @divTrunc(@as(isize, @intCast(field.len)), w) <= y) {
+        return;
+    }
+    const cell = &field[@intCast(y * w + x)];
+    cell.* = val;
+}
+
+fn count_digits(T: type, v: T) u16 {
+    var tmp = v;
+    var res: u16 = 0;
+    while (tmp != 0) {
+        tmp /= 10;
+        res += 1;
+    }
+    return res;
+}
+
+const day11 = struct {
+    const Counter = std.AutoHashMap(u64, u64);
+
+    fn blink(stones: *Counter, new_stones: *Counter) !void {
+        var stone_iter = stones.iterator();
+        while (stone_iter.next()) |entry| {
+            const stone = entry.key_ptr.*;
+            const count = entry.value_ptr.*;
+            if (stone == 0) {
+                (try new_stones.getOrPutValue(1, 0)).value_ptr.* += count;
+                continue;
+            }
+
+            const digits = count_digits(u64, stone);
+            if (digits % 2 == 0) {
+                const base = math.pow(u64, 10, digits / 2);
+                const left = stone / base;
+                (try new_stones.getOrPutValue(left, 0)).value_ptr.* += count;
+                const right = stone % base;
+                (try new_stones.getOrPutValue(right, 0)).value_ptr.* += count;
+            } else {
+                (try new_stones.getOrPutValue(stone * 2024, 0)).value_ptr.* += count;
+            }
+        }
+    }
+
+    pub fn solution(ally: mem.Allocator, input: []const u8) !void {
+        var part1_res: u64 = 0;
+        var part2_res: u64 = 0;
+
+        var nums_iter = mem.splitScalar(u8, input[0 .. input.len - 1], ' ');
+
+        var stones = Counter.init(ally);
+        var new_stones = Counter.init(ally);
+        while (nums_iter.next()) |num_str| {
+            (try stones.getOrPutValue(try fmt.parseInt(u64, num_str, 10), 0)).value_ptr.* += 1;
+        }
+
+        for (0..75) |i| {
+            if (i == 25) {
+                var stones_iter = stones.valueIterator();
+                while (stones_iter.next()) |stone| {
+                    part1_res += stone.*;
+                }
+            }
+            try blink(&stones, &new_stones);
+            const temp = new_stones;
+            stones.clearRetainingCapacity();
+            new_stones = stones;
+            stones = temp;
+        }
+
+        var stones_iter = stones.valueIterator();
+        while (stones_iter.next()) |stone| {
+            part2_res += stone.*;
+        }
+
+        debug.assert(part1_res == 193269);
+        debug.assert(part2_res == 228449040027793);
+        try stdout.print("part1: {d}, part2: {d}\n", .{ part1_res, part2_res });
+    }
+};
 
 const day10 = struct {
     const Point = struct { x: i16, y: i16 };
@@ -169,7 +391,7 @@ const day8 = struct {
         y: i32,
     };
 
-    fn set_cell(field: []u8, w: i32, x: i32, y: i32, antena: u8, val: u8, is_part_2: bool) void {
+    fn set_node(field: []u8, w: i32, x: i32, y: i32, antena: u8, val: u8, is_part_2: bool) void {
         if (x < 0 or w <= x or y < 0 or @divTrunc(@as(i32, @intCast(field.len)), w) <= y) {
             return;
         }
@@ -204,7 +426,7 @@ const day8 = struct {
                     const y_distance = b_pos.y - a_pos.y;
                     var antinode_x = b_pos.x;
                     var antinode_y = b_pos.y;
-                    set_cell(
+                    set_node(
                         part1_field,
                         @intCast(field_width),
                         antinode_x + x_distance,
@@ -228,7 +450,7 @@ const day8 = struct {
                     while ((0 <= antinode_x and 0 <= antinode_y) and
                         (antinode_x <= field_width and antinode_y <= field_width))
                     {
-                        set_cell(part2_field, @intCast(field_width), antinode_x, antinode_y, antena.key_ptr.*, '#', true);
+                        set_node(part2_field, @intCast(field_width), antinode_x, antinode_y, antena.key_ptr.*, '#', true);
                         antinode_x += x_distance;
                         antinode_y += y_distance;
                     }
@@ -248,11 +470,16 @@ const day8 = struct {
     }
 };
 
-fn get_cell(field: []const u8, w: usize, x: usize, y: usize) u8 {
+fn get_cell(field: []const u8, w: usize, x: isize, y: isize) u8 {
+    @setRuntimeSafety(false);
     if (x < 0 or w <= x or y < 0 or field.len / w <= y) {
         return 0;
     }
-    return field[y * w + x];
+    return field[@as(usize, @intCast(x)) + @as(usize, @intCast(y)) * w];
+}
+
+fn get_cell_by_pos(field: []const u8, w: usize, pos: Vec2) u8 {
+    return get_cell(field, w, pos.x, pos.y);
 }
 
 fn concat_nums(T: type, a: T, b: T) T {
@@ -351,7 +578,7 @@ const day6 = struct {
             var guard_x = guard_start_x;
             var guard_y = guard_start_y;
 
-            var guard_dir = get_cell(field, field_width, guard_x, guard_y);
+            var guard_dir = get_cell(field, field_width, @intCast(guard_x), @intCast(guard_y));
             while (0 < guard_x and guard_x < field_width and 0 < guard_y and guard_y < field_height) {
                 if (!is_first_part) {
                     if (field[guard_x + guard_y * field_width] == guard_dir and
@@ -375,7 +602,7 @@ const day6 = struct {
                     '>' => next_pos_x = guard_x + 1,
                     else => unreachable,
                 }
-                const next_pos_cell = get_cell(field, field_width, next_pos_x, next_pos_y);
+                const next_pos_cell = get_cell(field, field_width, @intCast(next_pos_x), @intCast(next_pos_y));
                 switch (next_pos_cell) {
                     '#' => {
                         switch (guard_dir) {

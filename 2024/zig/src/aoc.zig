@@ -30,7 +30,7 @@ pub fn run(ally: mem.Allocator, file_path: []const u8, comptime solution: Soluti
     const stdout = io.getStdOut().writer();
     try stdout.print("@=== {s}\n| ", .{file_path});
     const start_time = time.nanoTimestamp();
-    solution(arena_ally, file) catch unreachable;
+    try solution(arena_ally, file);
     const elapsed = time.nanoTimestamp() - start_time;
     try stdout.print("| time: {d}ns, {d}ms\n", .{ elapsed, (@as(f64, @floatFromInt(elapsed)) / 1000000) });
 }
