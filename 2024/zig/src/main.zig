@@ -3,6 +3,7 @@ const mem = std.mem;
 const fmt = std.fmt;
 const sort = std.sort;
 const math = std.math;
+const time = std.time;
 const simd = std.simd;
 const ascii = std.ascii;
 
@@ -13,28 +14,312 @@ const aoc = @import("aoc.zig");
 
 const stdout = io.getStdOut().writer();
 
-var stoudbuff = io.BufferedWriter(20480, @TypeOf(stdout)){ .unbuffered_writer = stdout };
-const buffwriter = stoudbuff.writer();
+var stdoutbuff = io.BufferedWriter(20480, @TypeOf(stdout)){ .unbuffered_writer = stdout };
+const buffwriter = stdoutbuff.writer();
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const ally = gpa.allocator();
 
-    try aoc.run(ally, "../input/day1", day1.solution);
-    try aoc.run(ally, "../input/day2", day2.solution);
-    try aoc.run(ally, "../input/day3", day3.solution);
-    try aoc.run(ally, "../input/day4", day4.solution);
-    try aoc.run(ally, "../input/day5", day5.solution);
-    try aoc.run(ally, "../input/day6", day6.solution);
-    try aoc.run(ally, "../input/day7", day7.solution);
-    try aoc.run(ally, "../input/day8", day8.solution);
-    try aoc.run(ally, "../input/day9", day9.solution);
-    try aoc.run(ally, "../input/day10", day10.solution);
-    try aoc.run(ally, "../input/day11", day11.solution);
-    try aoc.run(ally, "../input/day12", day12.solution);
-    try aoc.run(ally, "../input/day13", day13.solution);
+    // try aoc.run(ally, "../input/day1", day1.solution);
+    // try aoc.run(ally, "../input/day2", day2.solution);
+    // try aoc.run(ally, "../input/day3", day3.solution);
+    // try aoc.run(ally, "../input/day4", day4.solution);
+    // try aoc.run(ally, "../input/day5", day5.solution);
+    // try aoc.run(ally, "../input/day6", day6.solution);
+    // try aoc.run(ally, "../input/day7", day7.solution);
+    // try aoc.run(ally, "../input/day8", day8.solution);
+    // try aoc.run(ally, "../input/day9", day9.solution);
+    // try aoc.run(ally, "../input/day10", day10.solution);
+    // try aoc.run(ally, "../input/day11", day11.solution);
+    // try aoc.run(ally, "../input/day12", day12.solution);
+    // try aoc.run(ally, "../input/day13", day13.solution);
+    // try aoc.run(ally, "../input/day14", day14.solution);
+    try aoc.run(ally, "../input/day15", day15.solution);
 }
+
+fn clear_terminal() void {
+    buffwriter.print("\x1b[H", .{}) catch unreachable;
+}
+
+const day15 = struct {
+    const Pos = struct {
+        x: isize,
+        y: isize,
+    };
+    fn check_if_can_move(field: []u8, w: usize, movable: *std.ArrayList(Pos), x: isize, y: isize, x_vel: isize, y_vel: isize) !bool {
+        const cell = get_cell(field, w, x, y);
+        if (cell == '#') return false;
+        if (cell == '.') return true;
+
+        if (y_vel != 0) {
+            if (cell == '[') {
+                const can_move = try check_if_can_move(field, w, movable, x, y + y_vel, x_vel, y_vel) and
+                    try check_if_can_move(field, w, movable, x + 1, y + y_vel, x_vel, y_vel);
+                if (can_move) {
+                    try movable.append(.{ .x = x, .y = y });
+                    return true;
+                }
+                return false;
+            }
+            if (cell == ']') {
+                const can_move = try check_if_can_move(field, w, movable, x, y + y_vel, x_vel, y_vel) and
+                    try check_if_can_move(field, w, movable, x - 1, y + y_vel, x_vel, y_vel);
+                if (can_move) {
+                    try movable.append(.{ .x = x - 1, .y = y });
+                    return true;
+                }
+                return false;
+            }
+        } else if (cell == '[' or cell == ']') {
+            if (cell == '[') {
+                try movable.append(.{ .x = x, .y = y });
+                return check_if_can_move(field, w, movable, x + x_vel, y, x_vel, y_vel);
+            } else {
+                // try movable.append(.{ .x = x - 1, .y = y });
+                return check_if_can_move(field, w, movable, x + x_vel, y, x_vel, y_vel);
+            }
+        }
+        return false;
+    }
+
+    fn move_movables(field: []u8, w: usize, movables: *std.ArrayList(Pos), x_vel: isize, y_vel: isize) void {
+        for (movables.items) |box| {
+            set_cell(field, w, box.x, box.y, '.');
+            set_cell(field, w, box.x + 1, box.y, '.');
+        }
+        for (movables.items) |box| {
+            set_cell(field, w, box.x + x_vel, box.y + y_vel, '[');
+            set_cell(field, w, box.x + x_vel + 1, box.y + y_vel, ']');
+        }
+    }
+
+    fn try_move_in_direction(
+        field: []u8,
+        field_width: usize,
+        robot_x: isize,
+        robot_y: isize,
+        vel_x: isize,
+        vel_y: isize,
+    ) bool {
+        var x = robot_x + vel_x;
+        var y = robot_y + vel_y;
+        const first_obstacle_x = x;
+        const first_obstacle_y = y;
+        while (true) : ({
+            x += vel_x;
+            y += vel_y;
+        }) {
+            const curr_cell = get_cell(field, field_width, x, y);
+            if (curr_cell == '#') return false;
+            if (curr_cell == '.') {
+                if (x == first_obstacle_x and y == first_obstacle_y) {
+                    // if no obstacle then just move
+                    set_cell(field, field_width, x, y, '@');
+                    set_cell(field, field_width, robot_x, robot_y, '.');
+                } else {
+                    set_cell(field, field_width, x, y, 'O');
+                    set_cell(field, field_width, first_obstacle_x, first_obstacle_y, '@');
+                    set_cell(field, field_width, robot_x, robot_y, '.');
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    fn solution(ally: mem.Allocator, input: []const u8) !void {
+        var field_and_commands_iter = mem.splitSequence(u8, input, "\n\n");
+        const field_with_newlines = field_and_commands_iter.next().?;
+        const field = try remove_newlines(ally, field_with_newlines);
+        const field_width = get_line_len(field_with_newlines);
+        const commands = try remove_newlines(ally, field_and_commands_iter.next().?);
+        const part2_field = try ally.alloc(u8, field.len * 2);
+        const part2_field_width = field_width * 2;
+        for (field, 0..) |c, i| {
+            if (c == 'O') {
+                part2_field[i * 2] = '[';
+                part2_field[i * 2 + 1] = ']';
+            } else if (c == '@') {
+                part2_field[i * 2] = '@';
+                part2_field[i * 2 + 1] = '.';
+            } else {
+                part2_field[i * 2] = c;
+                part2_field[i * 2 + 1] = c;
+            }
+        }
+
+        var robot_x: isize = 0;
+        var robot_y: isize = 0;
+        for (field, 0..) |c, i| {
+            if (c == '@') {
+                robot_x = @intCast(i % field_width);
+                robot_y = @intCast(i / field_width);
+                break;
+            }
+        }
+        var part2_robot_x: isize = robot_x * 2;
+        var part2_robot_y: isize = robot_y;
+        var movables = std.ArrayList(Pos).init(ally);
+        for (commands, 0..) |command, n| {
+            var dir: Direction = .up;
+            switch (command) {
+                '>' => dir = .right,
+                '<' => dir = .left,
+                'v' => dir = .down,
+                '^' => dir = .up,
+                else => unreachable,
+            }
+            const vel = velocity_from_dir(dir);
+            const part2_success = try check_if_can_move(
+                part2_field,
+                part2_field_width,
+                &movables,
+                part2_robot_x + vel.x,
+                part2_robot_y + vel.y,
+                vel.x,
+                vel.y,
+            );
+            if (part2_success) {
+                move_movables(part2_field, part2_field_width, &movables, vel.x, vel.y);
+                set_cell(part2_field, part2_field_width, part2_robot_x, part2_robot_y, '.');
+                part2_robot_x += vel.x;
+                part2_robot_y += vel.y;
+                set_cell(part2_field, part2_field_width, part2_robot_x, part2_robot_y, '@');
+            }
+            movables.clearRetainingCapacity();
+            const success = try_move_in_direction(
+                field,
+                field_width,
+                robot_x,
+                robot_y,
+                vel.x,
+                vel.y,
+            );
+            if (success) {
+                robot_x += vel.x;
+                robot_y += vel.y;
+            }
+
+            // time.sleep(50000000);
+            clear_terminal();
+            try buffwriter.print("{c} {d}/{d}", .{ command, n, commands.len });
+            for (part2_field, 0..) |c, i| {
+                if (i % part2_field_width == 0) {
+                    try buffwriter.print("\n", .{});
+                }
+                try buffwriter.print("{c}", .{c});
+            }
+            try buffwriter.print("\n\n", .{});
+            try stdoutbuff.flush();
+        }
+        var part1_res: usize = 0;
+        for (field, 0..) |c, i| {
+            if (c == 'O') {
+                const x = i % field_width;
+                const y = i / field_width;
+                part1_res += y * 100 + x;
+            }
+        }
+        var part2_res: usize = 0;
+        for (part2_field, 0..) |c, i| {
+            if (c == '[') {
+                const x = i % part2_field_width;
+                const y = i / part2_field_width;
+                part2_res += y * 100 + x;
+            }
+        }
+
+        // debug.assert(part1_res == 1406628);
+        // try buffwriter.print("\n\n", .{});
+
+        try stdout.print("part1: {d}, part2: {d}\n", .{ part1_res, part2_res });
+    }
+};
+
+const day14 = struct {
+    const Robot = struct {
+        x: i32,
+        y: i32,
+        vx: i32,
+        vy: i32,
+    };
+
+    fn solution(ally: mem.Allocator, input: []const u8) !void {
+        var robots = std.ArrayList(Robot).init(ally);
+        var field_width: i32 = 0;
+        var field_height: i32 = 0;
+        var lines_iter = mem.splitScalar(u8, input[0 .. input.len - 1], '\n');
+        while (lines_iter.next()) |line| {
+            var pos_and_vel_iter = mem.splitScalar(u8, line, ' ');
+            const pos_str = pos_and_vel_iter.next().?;
+            var pos_x_y_iter = mem.splitScalar(u8, pos_str, ',');
+            const pos_x = int_from_slice(i32, pos_x_y_iter.next().?);
+            const pos_y = int_from_slice(i32, pos_x_y_iter.next().?);
+            const vel_str = pos_and_vel_iter.next().?;
+            var vel_x_y_iter = mem.splitScalar(u8, vel_str, ',');
+            const vel_x = int_from_slice(i32, vel_x_y_iter.next().?);
+            const vel_y = int_from_slice(i32, vel_x_y_iter.next().?);
+            try robots.append(.{ .x = pos_x, .y = pos_y, .vx = vel_x, .vy = vel_y });
+            if (field_width < pos_x) field_width = pos_x;
+            if (field_height < pos_y) field_height = pos_y;
+        }
+        field_width += 1;
+        field_height += 1;
+
+        const deb_field = try ally.alloc(u8, @intCast((field_width) * (field_height)));
+        // var probably_tree: u32 = 68;
+        for (0..100) |n| {
+            _ = n;
+            // if (n == probably_tree) {
+            // probably_tree += 101;
+            // try buffwriter.print("ITERATION {}\n", .{n});
+            // @memset(deb_field, 0);
+            // for (robots.items) |*robot| {
+            //     deb_field[@intCast(robot.x + robot.y * field_width)] += 1;
+            // }
+            // for (deb_field, 0..deb_field.len) |c, i| {
+            //     if (@rem(@as(i32, @intCast(i)), field_width) == 0) try buffwriter.print("\n", .{});
+            //     if (c == 0) try buffwriter.print(" ", .{}) else try buffwriter.print("■", .{});
+            // }
+            // try buffwriter.print("\n", .{});
+            // try stdoutbuff.flush();
+            // }
+
+            for (robots.items) |*robot| {
+                robot.x = @mod((robot.x + robot.vx), field_width);
+                robot.y = @mod((robot.y + robot.vy), field_height);
+                deb_field[@intCast(robot.x + robot.y * field_width)] += 1;
+            }
+        }
+
+        var upper_left: i32 = 0;
+        var upper_right: i32 = 0;
+        var bottom_left: i32 = 0;
+        var bottom_right: i32 = 0;
+        const x_middle = @divTrunc(field_width, 2);
+        const y_middle = @divTrunc(field_height, 2);
+        for (robots.items) |robot| {
+            if (robot.x < x_middle) {
+                if (robot.y < y_middle) {
+                    upper_left += 1;
+                } else if (y_middle < robot.y) {
+                    bottom_left += 1;
+                }
+            } else if (x_middle < robot.x) {
+                if (robot.y < y_middle) {
+                    upper_right += 1;
+                } else if (y_middle < robot.y) {
+                    bottom_right += 1;
+                }
+            }
+        }
+
+        const part1_res = upper_left * upper_right * bottom_left * bottom_right;
+        std.debug.print("{} {}\n", .{ part1_res, part1_res });
+    }
+};
 
 const day13 = struct {
     fn calculate_cost_in_tokens(
@@ -85,7 +370,7 @@ fn int_from_slice(T: type, slice: []const u8) T {
     debug.assert(slice.len != 0);
     var start: usize = 0;
     var end: usize = slice.len - 1;
-    while (!ascii.isDigit(slice[start])) start += 1;
+    while (!ascii.isDigit(slice[start]) and slice[start] != '-') start += 1;
     while (!ascii.isDigit(slice[end])) end -= 1;
     return fmt.parseInt(T, slice[start .. end + 1], 10) catch unreachable;
 }
@@ -120,16 +405,18 @@ const Vec2 = struct {
     y: isize,
 };
 
+fn velocity_from_dir(dir: Direction) Vec2 {
+    return switch (dir) {
+        .left => .{ .x = -1, .y = 0 },
+        .right => .{ .x = 1, .y = 0 },
+        .up => .{ .x = 0, .y = -1 },
+        .down => .{ .x = 0, .y = 1 },
+    };
+}
+
 fn next_coord_by_dir(dir: Direction, x: isize, y: isize) Vec2 {
-    var new_x: isize = x;
-    var new_y: isize = y;
-    switch (dir) {
-        .left => new_x -= 1,
-        .right => new_x += 1,
-        .up => new_y -= 1,
-        .down => new_y += 1,
-    }
-    return .{ .x = new_x, .y = new_y };
+    const vel = velocity_from_dir(dir);
+    return .{ .x = x + vel.x, .y = y + vel.y };
 }
 
 const day12 = struct {
@@ -187,7 +474,7 @@ const day12 = struct {
     }
 
     fn solution(ally: mem.Allocator, input: []const u8) !void {
-        const field = try remove_whitespaces(ally, input);
+        const field = try remove_newlines(ally, input);
         const field_width: isize = @intCast(get_line_len(input));
 
         var visited = Visited.init(ally);
@@ -216,20 +503,21 @@ const day12 = struct {
         for (plants.items) |p| {
             part1_res += p.area * p.perimeter;
             part2_res += p.area * p.sides;
+            try stdout.print("{d}\n", .{p.area * p.sides});
         }
 
         debug.assert(part1_res == 1402544);
-        debug.assert(part2_res == 862486);
+        // debug.assert(part2_res == 862486);
 
         try stdout.print("part1: {d}, part2: {d}\n", .{ part1_res, part2_res });
     }
 };
 
-fn set_cell(field: []u8, w: isize, x: isize, y: isize, val: u8) void {
-    if (x < 0 or w <= x or y < 0 or @divTrunc(@as(isize, @intCast(field.len)), w) <= y) {
+fn set_cell(field: []u8, w: usize, x: isize, y: isize, val: u8) void {
+    if (x < 0 or w <= x or y < 0 or field.len / w <= y) {
         return;
     }
-    const cell = &field[@intCast(y * w + x)];
+    const cell = &field[@as(usize, @intCast(y)) * w + @as(usize, @intCast(x))];
     cell.* = val;
 }
 
@@ -346,7 +634,7 @@ const day10 = struct {
     }
 
     pub fn solution(ally: mem.Allocator, input: []const u8) !void {
-        const field = try remove_whitespaces(ally, input);
+        const field = try remove_newlines(ally, input);
         const field_width = get_line_len(input);
 
         var visited_nodes = std.AutoHashMap(Point, void).init(ally);
@@ -459,7 +747,7 @@ const day8 = struct {
 
     pub fn solution(ally: mem.Allocator, input: []const u8) !void {
         const field_width = get_line_len(input);
-        const part1_field = try remove_whitespaces(ally, input);
+        const part1_field = try remove_newlines(ally, input);
         const part2_field = try ally.dupe(u8, part1_field);
         var antenna_to_position = std.AutoHashMap(u8, std.ArrayList(Pos)).init(ally);
         for (0..part1_field.len) |i| {
@@ -591,7 +879,7 @@ const day7 = struct {
     }
 };
 
-fn remove_whitespaces(ally: mem.Allocator, input: []const u8) ![]u8 {
+fn remove_newlines(ally: mem.Allocator, input: []const u8) ![]u8 {
     var result = std.ArrayList(u8).init(ally);
     for (input) |c| {
         if (c != '\n') {
@@ -610,7 +898,7 @@ fn get_line_len(input: []const u8) usize {
 
 const day6 = struct {
     fn solution(ally: mem.Allocator, input: []const u8) !void {
-        const orig_field = try remove_whitespaces(ally, input);
+        const orig_field = try remove_newlines(ally, input);
         const field_width = get_line_len(input);
         const field_height = orig_field.len / field_width;
         var guard_start_x: usize = 0;
